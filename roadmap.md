@@ -6,8 +6,9 @@
 
 **Goal:**  
 Build a custom SSO service that enables seamless authentication across containerized services (WordPress, Nextcloud, Ghost, Humhub, etc.) on subdomains. The solution is written entirely in vanilla PHP (no frameworks or external libraries) and uses minimal external services.  
- 
+
 **Deployment Environment:**  
+
 - Debian VPS (e.g., Contabo)  
 - Domain from OVH  
 - Initial storage via SQLite or JSON flat files, with a migration path to MariaDB
@@ -17,21 +18,27 @@ Build a custom SSO service that enables seamless authentication across container
 ## 2. System Architecture
 
 ### A. Core Components
+
 - **SSO Backend API (Vanilla PHP):**  
+  
   - Provides endpoints for login, token creation, validation, and logout
   - Handles session management and secure cookie issuance across subdomains
 
 - **Admin Web Interface:**  
+  
   - Simple HTML/CSS/JavaScript frontend for managing users, services, permissions, and logs
 
 - **Service Plugins/Adapters:**  
+  
   - Custom code, or minimal plugins, to integrate each consuming application (WordPress, Nextcloud, Ghost, Humhub)
   - Each adapter ensures that when a user is authenticated via SSO, the local session in the respective service is automatically created
 
 - **Data Persistence:**  
+  
   - Start with SQLite or JSON file storage for sessions and user data, later migrating to a full MariaDB schema if needed
 
 ### B. Communication & Data Flow
+
 ```
 [User] → [Service Login (WP, Nextcloud, etc.)] → [SSO Validation (API)] → [Auth Token & Cookie Set]
 ↓                             ↑                                ↓
@@ -45,11 +52,14 @@ Build a custom SSO service that enables seamless authentication across container
 ### **Phase 1: SSO Server - Backend Core Implementation (Weeks 1–4)**
 
 #### Week 1: Foundation Setup
+
 - **Project Structure:**  
+  
   - Define a clean folder hierarchy (e.g., `/api`, `/admin`, `/data`)
   - Decide on using vanilla PHP (no frameworks)
-  
+
 - **Database/Storage Setup:**  
+  
   - Create the initial storage for sessions and users  
     - Options: Flat JSON files or SQLite  
   - Define a basic schema:
@@ -59,19 +69,25 @@ Build a custom SSO service that enables seamless authentication across container
     - **Permissions/Logs:** For audit trail and access controls
 
 - **Configuration System:**  
+  
   - Create a simple PHP config file for secrets, database settings, and environment flags
 
 #### Week 2: Authentication and Token Management
+
 - **User Login Flow:**  
+  
   - Create a login form on the SSO server (`sso.example.com/auth`)
   - Upon submission, validate credentials (password verification, etc.)
-  
+
 - **Token Generation:**  
+  
   - Generate a secure token (optionally as a JWT-like structure with claims such as user id, timestamp, expiration, and a unique jti)
   - Store token details and expiration in your sessions storage
-  
+
 - **Cookie Management:**  
+  
   - Set a secure cookie:
+    
     ```php
     setcookie("sso_token", $token, [
       'expires'  => time() + 900, // 15 minutes
@@ -82,14 +98,17 @@ Build a custom SSO service that enables seamless authentication across container
       'samesite' => 'Strict',
     ]);
     ```
-  
+
 - **CSRF Protection:**  
-  - Implement double-submit tokens on all state-changing POST requests (generate a CSRF token and set it in both a cookie and a hidden form field)
   
+  - Implement double-submit tokens on all state-changing POST requests (generate a CSRF token and set it in both a cookie and a hidden form field)
+
 - **XSS Prevention:**  
+  
   - Escape all output with `htmlspecialchars` and deploy a strict Content-Security-Policy header
 
 #### Week 3: Create Core API Endpoints
+
 - **Endpoints to build:**  
   - `/auth` – handles user login, token generation, and sets cookies  
   - `/validate_token` – accepts a token parameter (via GET or header) and returns JSON with user info if valid:
@@ -99,6 +118,7 @@ Build a custom SSO service that enables seamless authentication across container
   - Additional endpoints (if needed): `/register` for new users, `/sync` for cross-service user sync (password/hashes)
 
 #### Week 4: Enhance Security and Session Management
+
 - **Token Replay Protection:**  
   - Optionally store `jti` values and reject tokens if reused after logout
 - **Implement Automatic Refresh:**  
@@ -113,6 +133,7 @@ Build a custom SSO service that enables seamless authentication across container
 ### **Phase 2: Admin Interface & Extended Features (Weeks 5–6)**
 
 #### Week 5: Administrative API & UI
+
 - **Admin Authentication:**  
   - Build an admin login page with elevated privileges
 - **Management Endpoints:**  
@@ -125,6 +146,7 @@ Build a custom SSO service that enables seamless authentication across container
   - Develop a basic dashboard with HTML/CSS/JS that shows system stats, active sessions, and recent logins
 
 #### Week 6: Security Hardening & Testing
+
 - **Implement Additional Security Measures:**  
   - Enforce input validation, session expiries, and IP tracking
   - Develop custom error messages and proper HTTP status responses
@@ -138,6 +160,7 @@ Build a custom SSO service that enables seamless authentication across container
 For each service, create a minimal adapter or plugin using the native facilities of that platform. The following provides an outline for each:
 
 #### **Integration Strategy (General)**
+
 - **Token Verification:**  
   - The client app (or its custom plugin) checks for the SSO cookie (`sso_token`)
   - It then makes an HTTP call to your SSO `/validate_token` endpoint
@@ -145,10 +168,11 @@ For each service, create a minimal adapter or plugin using the native facilities
 - **Preferred Methods:**  
   - **Cookie-based:** Automatically read the token
   - **URL-token redirect:** Fall-back method where SSO redirects with `?token=xyz`
-  
+
 ---
 
 #### A. **WordPress Integration (Week 7)**
+
 - **Plugin/Theme Functionality:**  
   - In your `functions.php` or a small custom plugin:
     - Check if `$_COOKIE['sso_token']` exists on `init`
@@ -159,6 +183,7 @@ For each service, create a minimal adapter or plugin using the native facilities
   - Ensure HTTPS is used and rate-limit validation calls
 
 #### B. **Nextcloud Integration (Week 8)**
+
 - **Plugin/Adapter:**  
   - Either develop a Nextcloud “app” or adapt existing modules (for example, using “user_external”) to validate SSO tokens:
     - On login, redirect to your SSO service (or have the user present a token)
@@ -168,6 +193,7 @@ For each service, create a minimal adapter or plugin using the native facilities
   - Nextcloud’s plugin system offers hooks that let you override the default authentication process
 
 #### C. **Ghost Integration (Week 8–9)**
+
 - **Middleware or Reverse Proxy Option:**  
   - Given Ghost’s simplicity, you can either modify a custom middleware or run Ghost behind a reverse proxy that intercepts requests:
     - Validate token from the cookie/URL header
@@ -176,6 +202,7 @@ For each service, create a minimal adapter or plugin using the native facilities
   - Alternatively, integrate a small login widget that calls your SSO and sets a local session
 
 #### D. **Humhub Integration (Week 9)**
+
 - **Custom AuthClient:**  
   - Use Humhub’s built-in `authclient` module to create a custom client that communicates with your SSO:
     - On login, redirect to your SSO endpoint for token validation
@@ -188,6 +215,7 @@ For each service, create a minimal adapter or plugin using the native facilities
 ### **Phase 4: Testing, Optimization, and Documentation (Weeks 10–11)**
 
 #### Testing & Quality Assurance
+
 - **Unit Testing:**  
   - Write tests for each API endpoint (login, validate_token, logout)
 - **Integration Testing:**  
@@ -199,6 +227,7 @@ For each service, create a minimal adapter or plugin using the native facilities
   - Ensure the token validation endpoint and session management are performant under load
 
 #### Documentation
+
 - **Installation Guide:**  
   - Instructions for setting up the SSO server, including environment configuration and data storage options
 - **Admin Manual:**  
@@ -208,6 +237,7 @@ For each service, create a minimal adapter or plugin using the native facilities
   - API documentation for `/auth`, `/validate_token`, and `/logout`
 
 #### Deployment Scripts
+
 - **CI/CD Setup:**  
   - Build simple shell scripts or makefiles to deploy updates to your Debian VPS
 - **Containerization (Optional):**  
@@ -229,22 +259,26 @@ For each service, create a minimal adapter or plugin using the native facilities
 ## Summary Checklist
 
 1. **SSO Server Setup:**  
+   
    - Implement login, token generation (JWT-like), CSRF & XSS protection, secure cookies  
    - Create `/auth`, `/validate_token`, `/logout` endpoints
 
 2. **Admin Dashboard:**  
+   
    - Develop management UI and API endpoints for users, services, permissions, and logs
 
 3. **Client Integrations:**  
+   
    - **WordPress:** Plugin to intercept logins via `sso_token` cookie  
    - **Nextcloud:** Adapter or Nextcloud app for external authentication  
    - **Ghost & Humhub:** Custom middleware or authclient modules to auto-login users
 
 4. **Security and Testing:**  
+   
    - Enforce HTTPS, short-lived tokens, rate limiting, input sanitation  
    - Develop manual pen testing routines and automated tests
 
 5. **Documentation & Deployment:**  
+   
    - Prepare user, admin, and developer documentation  
    - Create deployment scripts with potential containerization for the future
-   
