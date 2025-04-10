@@ -14,8 +14,6 @@ ressources/
 # macOS
 .DS_*
 .DS_Store
-docs/.DS_Store
-ressources/.DS_Store
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
